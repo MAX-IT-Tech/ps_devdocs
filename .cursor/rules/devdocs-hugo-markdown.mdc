@@ -1,0 +1,36 @@
+---
+description: Hugo Markdown formatting guardrails for DevDocs pages
+globs: "**/*.md"
+alwaysApply: false
+---
+
+# PrestaShop DevDocs - Hugo Markdown
+
+Use this companion rule for markdown formatting only. Repository-wide quality gates are defined in `devdocs-systematic-quality-gates.mdc` (always on).
+
+This repository is Hugo content using [Goldmark](https://github.com/yuin/goldmark). Follow existing file patterns and avoid generic markdown reformatting.
+
+## Front matter
+
+- Keep YAML front matter between `---` markers.
+- Do not add or remove fields unless explicitly requested.
+- Do not rewrite YAML indentation/order for style only.
+
+## Hugo shortcodes
+
+- Keep shortcode syntax unchanged: `{{< ... >}}`, `{{% ... %}}`, `relref`/`ref`.
+- Do not rename shortcodes or alter bracket style without task requirements.
+- Keep internal links in repository style; use plain markdown for external URLs.
+
+## Do Not Auto-Refactor
+
+- Do not insert extra spaces in links.
+- Do not remove intentional trailing spaces used for markdown line breaks.
+- Do not switch list markers (`*` vs `-`) for style only.
+- Do not add/remove blank lines without semantic reason.
+- Do not change fenced code block language tags or delimiters unless requested.
+
+## Repository References
+
+- [Writing Markdown](contribute/documentation/how/writing-markdown.md)
+- [Shortcodes index](contribute/documentation/shortcodes/_index.md)

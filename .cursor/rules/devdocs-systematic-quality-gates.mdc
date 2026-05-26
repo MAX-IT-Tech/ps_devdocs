@@ -1,0 +1,43 @@
+---
+description: Repository-wide quality gates for PrestaShop DevDocs changes
+alwaysApply: true
+---
+
+# PrestaShop DevDocs: Systematic Quality
+
+Apply this to every docs area: hooks, Admin API, modules, themes, webservice, basics, contribution guides, and all version branches.
+
+## Work Systemically
+
+- Treat review comments and maintainer follow-up commits as examples of a class of issue.
+- Audit the full changed scope for similar issues before editing.
+- For version migrations, verify behavior against the target branch, not previous docs.
+- Prefer deleting obsolete pages over preserving stale documentation.
+
+## Source of Truth
+
+- Core behavior: target `PrestaShop/PrestaShop` branch.
+- Theme behavior: `classic-theme` and `hummingbird`.
+- Module behavior: official native module repositories.
+- Existing docs are not authoritative when source code disagrees.
+
+## Content Accuracy
+
+- Examples must be current, minimal, and copied from real source behavior.
+- Do not include unrelated surrounding code, constants, comments, or half-copied arrays.
+- Code fence language must match the snippet syntax.
+- Parameter arrays must be complete for the current call, including references and flags.
+- Never leave placeholders, partial links, or known-broken URLs.
+
+## Verification Before Push
+
+- Run area-specific validators and a CI-equivalent Hugo build.
+- Check changed links and examples against source.
+- Do not push until validation passes.
+
+## Continuous Improvement
+
+When a new failure pattern is discovered:
+- Add it to the relevant rule.
+- Add or improve a deterministic local check when possible.
+- Re-run the full-scope audit to prove no similar cases remain.

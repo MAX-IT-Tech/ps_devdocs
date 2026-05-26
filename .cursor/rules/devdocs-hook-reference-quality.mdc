@@ -1,0 +1,34 @@
+---
+description: Hook reference metadata and call example quality rules
+globs: modules/concepts/hooks/list-of-hooks/*.md
+alwaysApply: false
+---
+
+# Hook Reference Quality
+
+Use this when editing generated or manually corrected hook reference pages.
+
+## Metadata Rules
+
+- `files[].url` must point to an existing source file in the correct repository.
+- Core links use `PrestaShop/PrestaShop` target branch.
+- Theme links use `classic-theme` or `hummingbird`, not `PrestaShop/PrestaShop/themes/...`.
+- Module links use native module repositories, not `PrestaShop/PrestaShop/modules/...`.
+- Do not use `files: {}` when a reviewer or source code identifies a real origin.
+- Delete pages for hooks that no longer dispatch in the target branch.
+
+## Call Example Rules
+
+- The call block must show the actual hook invocation, not adjacent code.
+- Include the full current parameter array, including `id_shop`, `chain`, by-reference values, and return flags when present.
+- Do not keep truncated fragments like only the hook name or first array keys.
+- Use `twig` fences for `renderhook(...)` and `php` fences for `Hook::exec(...)`.
+- Remove copied constants, comments, copyright headers, `include(...)`, layout markup, and unrelated code.
+- Smarty `{hook ...}` snippets must not end with `;`.
+
+## Systemic Checks
+
+- Search all changed hook pages for the same pattern after fixing one comment.
+- Verify deleted/empty-source candidates with source search, not only `hook.xml`.
+- Treat allow-list constants as references, not proof that a hook is dispatched.
+- Re-run hook validation, source-link checks, and Hugo build before push.
