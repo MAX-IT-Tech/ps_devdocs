@@ -1,0 +1,48 @@
+name: Docs QA Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "9.x"
+      - "feat/**"
+      - "fix/**"
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ensure reference mirrors
+        run: |
+          mkdir -p .reference
+          [[ -d .reference/prestashop/.git ]] || git clone --depth 1 --branch 9.1.x https://github.com/PrestaShop/PrestaShop.git .reference/prestashop
+          [[ -d .reference/classic-theme/.git ]] || git clone --depth 1 --branch develop https://github.com/PrestaShop/classic-theme.git .reference/classic-theme
+          [[ -d .reference/hummingbird/.git ]] || git clone --depth 1 --branch develop https://github.com/PrestaShop/hummingbird.git .reference/hummingbird
+
+      - name: Resolve base branch ref
+        id: base
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "ref=origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+            git fetch origin "${{ github.base_ref }}" --depth=1
+          else
+            echo "ref=origin/9.x" >> "$GITHUB_OUTPUT"
+            git fetch origin 9.x --depth=1
+          fi
+
+      - name: Run docs QA gate
+        run: |
+          python3 scripts/qa_docs_gate.py \
+            --scope changed \
+            --base-ref "${{ steps.base.outputs.ref }}" \
+            --rebuild-index

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "default_mode": "strict",
+  "transitional_branches": ["local/wip-docs-artifacts"],
+  "notes": "Transitional mode validates only commits/files in the push range. Remove branches from transitional_branches once rebased onto a clean feat/* or fix/* branch."
+}

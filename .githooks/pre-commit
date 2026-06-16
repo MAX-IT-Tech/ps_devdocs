@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${SKIP_DOCS_PRECOMMIT:-0}" == "1" ]]; then
+  echo "[pre-commit] SKIP_DOCS_PRECOMMIT=1, skipping checks."
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STAGED_FILES="$(git diff --cached --name-only --diff-filter=ACMR || true)"
+
+if [[ -z "$STAGED_FILES" ]]; then
+  echo "[pre-commit] No staged files, skipping."
+  exit 0
+fi
+
+if ! echo "$STAGED_FILES" | rg -q '\.md$|^\.github/workflows/build\.yml$'; then
+  echo "[pre-commit] No docs-related staged files, skipping."
+  exit 0
+fi
+
+echo "[pre-commit] Running docs QA gate (staged scope)..."
+python3 "$REPO_ROOT/scripts/qa_docs_gate.py" --scope staged --rebuild-index
+
+if [[ "${SKIP_HUGO_PRECOMMIT:-0}" == "1" ]]; then
+  echo "[pre-commit] SKIP_HUGO_PRECOMMIT=1, skipping Hugo build."
+  exit 0
+fi
+
+DEV_SITE="$REPO_ROOT/.reference/devdocs-site"
+HUGO_IMAGE="${HUGO_DOCKER_IMAGE:-hugomods/hugo:exts-0.121.1}"
+VERSION="${DEVDOCS_VERSION:-9}"
+
+echo "[pre-commit] Running local CI-like Hugo build for /$VERSION..."
+
+if [[ ! -d "$DEV_SITE/.git" ]]; then
+  git clone --depth 1 https://github.com/PrestaShop/devdocs-site.git "$DEV_SITE"
+fi
+
+git -C "$DEV_SITE" submodule update --init --depth 1 src/themes/ps-docs-theme
+
+if [[ ! -d "$DEV_SITE/src/content/1.7/.git" ]]; then
+  rm -rf "$DEV_SITE/src/content/1.7"
+  git clone --depth 1 --branch 1.7.x https://github.com/PrestaShop/docs.git "$DEV_SITE/src/content/1.7"
+fi
+
+if [[ ! -d "$DEV_SITE/src/content/8/.git" ]]; then
+  rm -rf "$DEV_SITE/src/content/8"
+  git clone --depth 1 --branch 8.x https://github.com/PrestaShop/docs.git "$DEV_SITE/src/content/8"
+fi
+
+TARGET="$DEV_SITE/src/content/$VERSION"
+rm -rf "$TARGET"
+mkdir -p "$(dirname "$TARGET")"
+
+rsync -a --delete \
+  --exclude ".git" \
+  --exclude ".reference" \
+  --exclude ".cursor" \
+  --exclude ".specstory" \
+  --exclude ".vscode" \
+  --exclude "node_modules" \
+  "$REPO_ROOT/" "$TARGET/"
+
+docker run --rm -v "$DEV_SITE:/site" -w /site/src "$HUGO_IMAGE" hugo >/dev/null
+
+echo "[pre-commit] Hugo build passed."

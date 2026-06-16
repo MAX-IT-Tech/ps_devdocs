@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${SKIP_DOCS_PREPUSH:-0}" == "1" ]]; then
+  echo "[pre-push] SKIP_DOCS_PREPUSH=1, skipping checks."
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+HEAD_SHA="$(git rev-parse HEAD)"
+BASE_REF="${DOCS_BASE_REF:-upstream/9.x}"
+POLICY_MODE="$(python3 "$REPO_ROOT/scripts/docs_push_policy.py" "$BRANCH")"
+
+PUSH_LOCAL_SHA="$HEAD_SHA"
+REMOTE_SHA=""
+while read -r _ local_sha _ remote_sha; do
+  [[ -z "${local_sha:-}" ]] && continue
+  PUSH_LOCAL_SHA="$local_sha"
+  if [[ "${remote_sha:-}" =~ ^0+$ ]]; then
+    REMOTE_SHA=""
+  else
+    REMOTE_SHA="$remote_sha"
+  fi
+done
+
+if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+  BASE_REF="origin/9.x"
+fi
+
+if [[ "$POLICY_MODE" == "transitional" ]]; then
+  echo "[pre-push] Transitional mode enabled for branch '$BRANCH'."
+  if [[ -n "$REMOTE_SHA" ]]; then
+    DIFF_RANGE="${REMOTE_SHA}..${PUSH_LOCAL_SHA}"
+  elif git rev-parse --verify "refs/remotes/publish/${BRANCH}" >/dev/null 2>&1; then
+    DIFF_RANGE="refs/remotes/publish/${BRANCH}..${PUSH_LOCAL_SHA}"
+  elif git rev-parse --verify "refs/remotes/origin/${BRANCH}" >/dev/null 2>&1; then
+    DIFF_RANGE="refs/remotes/origin/${BRANCH}..${PUSH_LOCAL_SHA}"
+  else
+    UPSTREAM_REF="$(git rev-parse --abbrev-ref --symbolic-full-name "${BRANCH}@{upstream}" 2>/dev/null || true)"
+    UPSTREAM_BRANCH="${UPSTREAM_REF##*/}"
+    if [[ -n "$UPSTREAM_REF" && "$UPSTREAM_BRANCH" == "$BRANCH" ]] && git rev-parse --verify "$UPSTREAM_REF" >/dev/null 2>&1; then
+      DIFF_RANGE="${UPSTREAM_REF}..${PUSH_LOCAL_SHA}"
+    else
+      DIFF_RANGE=""
+    fi
+  fi
+else
+  echo "[pre-push] Strict mode for branch '$BRANCH'."
+  DIFF_RANGE="${BASE_REF}...HEAD"
+fi
+
+if [[ "$POLICY_MODE" != "transitional" ]]; then
+  if [[ "$BRANCH" =~ ^(local|wip|scratch)/ ]]; then
+    echo "[pre-push] Push is blocked for branch '$BRANCH'."
+    echo "[pre-push] Rename branch to feat/* or fix/* before publishing."
+    exit 1
+  fi
+
+  if [[ ! "$BRANCH" =~ ^(feat|fix)/ ]]; then
+    echo "[pre-push] Branch '$BRANCH' does not match allowed patterns feat/* or fix/*."
+    exit 1
+  fi
+fi
+
+FORBIDDEN_RE='^(\.specstory/|tmp_groups/|\.cursor/plans/|\.reference/)'
+if [[ "$POLICY_MODE" == "transitional" && -z "$DIFF_RANGE" ]]; then
+  echo "[pre-push] Transitional mode: no remote push range resolved; skipping forbidden-path scan."
+  echo "[pre-push] Set upstream to the same branch on publish/origin or pass PUSH_RANGE to make qa-final-transitional."
+elif [[ -n "$DIFF_RANGE" ]] && git diff --name-only --diff-filter=ACMR "$DIFF_RANGE" | rg -q "$FORBIDDEN_RE"; then
+  echo "[pre-push] Found forbidden paths in checked diff range ($DIFF_RANGE):"
+  git diff --name-only --diff-filter=ACMR "$DIFF_RANGE" | rg "$FORBIDDEN_RE" || true
+  exit 1
+fi
+
+STAMP_FILE="$REPO_ROOT/.git/qa/docs_gate_final_${BRANCH//\//__}.json"
+if [[ ! -f "$STAMP_FILE" ]]; then
+  echo "[pre-push] Missing final QA stamp for branch '$BRANCH'."
+  if [[ "$POLICY_MODE" == "transitional" ]]; then
+    echo "[pre-push] Run:"
+    echo "  make qa-final-transitional"
+  else
+    echo "[pre-push] Run:"
+    echo "  make qa-final"
+  fi
+  exit 1
+fi
+
+read_stamp_field() {
+  python3 - "$STAMP_FILE" "$1" <<'PY'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1])
+field = sys.argv[2]
+data = json.loads(p.read_text(encoding="utf-8"))
+print(data.get(field, ""))
+PY
+}
+
+STAMP_SHA="$(read_stamp_field sha)"
+STAMP_MODE="$(read_stamp_field mode)"
+STAMP_RANGE="$(read_stamp_field diff_range)"
+
+if [[ "$STAMP_SHA" != "$HEAD_SHA" ]]; then
+  echo "[pre-push] Final QA stamp is stale."
+  echo "[pre-push] stamped_sha=$STAMP_SHA"
+  echo "[pre-push] current_sha=$HEAD_SHA"
+  echo "[pre-push] Re-run final QA after latest commit."
+  exit 1
+fi
+
+if [[ "$POLICY_MODE" == "transitional" ]]; then
+  if [[ "$STAMP_MODE" != "transitional" ]]; then
+    echo "[pre-push] Branch requires transitional QA stamp (mode=transitional)."
+    echo "[pre-push] Run: make qa-final-transitional"
+    exit 1
+  fi
+else
+  if [[ -n "$STAMP_MODE" && "$STAMP_MODE" != "strict" ]]; then
+    echo "[pre-push] Branch requires strict QA stamp (mode=strict)."
+    echo "[pre-push] Run: make qa-final"
+    exit 1
+  fi
+fi
+
+if [[ "$POLICY_MODE" == "transitional" && -n "$STAMP_RANGE" && -n "$DIFF_RANGE" && "$STAMP_RANGE" != "$DIFF_RANGE" ]]; then
+  echo "[pre-push] Transitional QA stamp range does not match push range."
+  echo "[pre-push] stamped_range=$STAMP_RANGE"
+  echo "[pre-push] push_range=$DIFF_RANGE"
+  echo "[pre-push] Re-run: make qa-final-transitional PUSH_RANGE='$DIFF_RANGE'"
+  exit 1
+fi
+
+echo "[pre-push] All push gates passed ($POLICY_MODE mode${DIFF_RANGE:+, range: $DIFF_RANGE})."

@@ -16,6 +16,8 @@ Use this when editing generated or manually corrected hook reference pages.
 - Module links use native module repositories, not `PrestaShop/PrestaShop/modules/...`.
 - Do not use `files: {}` when a reviewer or source code identifies a real origin.
 - Delete pages for hooks that no longer dispatch in the target branch.
+- Never accept branch-only replacements (`8.x` -> `9.1.x`) without path existence verification.
+- If origin is `module`, `files[].url` must not be empty.
 
 ## Call Example Rules
 
@@ -23,6 +25,7 @@ Use this when editing generated or manually corrected hook reference pages.
 - Include the full current parameter array, including `id_shop`, `chain`, by-reference values, and return flags when present.
 - Do not keep truncated fragments like only the hook name or first array keys.
 - Use `twig` fences for `renderhook(...)` and `php` fences for `Hook::exec(...)`.
+- Use `smarty` fences for Smarty `{hook h='...'}` snippets.
 - Remove copied constants, comments, copyright headers, `include(...)`, layout markup, and unrelated code.
 - Smarty `{hook ...}` snippets must not end with `;`.
 
@@ -31,4 +34,4 @@ Use this when editing generated or manually corrected hook reference pages.
 - Search all changed hook pages for the same pattern after fixing one comment.
 - Verify deleted/empty-source candidates with source search, not only `hook.xml`.
 - Treat allow-list constants as references, not proof that a hook is dispatched.
-- Re-run hook validation, source-link checks, and Hugo build before push.
+- Re-run `scripts/qa_docs_gate.py` and Hugo build before push.

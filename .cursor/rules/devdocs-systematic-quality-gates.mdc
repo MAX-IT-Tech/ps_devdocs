@@ -7,6 +7,14 @@ alwaysApply: true
 
 Apply this to every docs area: hooks, Admin API, modules, themes, webservice, basics, contribution guides, and all version branches.
 
+## Four-Layer Protection Model
+
+- Layer 1, Git controls: use `origin` as fetch-only and push only via `publish`.
+- Layer 1, Git hooks: `pre-commit` and `pre-push` must be active through `core.hooksPath=.githooks`.
+- Layer 2, QA gate: run `scripts/qa_docs_gate.py` as the single source of validation truth.
+- Layer 3, Cursor workflow: always run full-scope audits, not point fixes.
+- Layer 4, GitHub protection: require PR checks (`build` and `docs-qa`) before merge.
+
 ## Work Systemically
 
 - Treat review comments and maintainer follow-up commits as examples of a class of issue.
@@ -31,9 +39,21 @@ Apply this to every docs area: hooks, Admin API, modules, themes, webservice, ba
 
 ## Verification Before Push
 
-- Run area-specific validators and a CI-equivalent Hugo build.
+- Run the unified gate: `python3 scripts/qa_docs_gate.py --scope changed --base-ref upstream/9.x --rebuild-index`.
+- Run final gate before push: `make qa-final` (strict) or `make qa-final-transitional` (listed transitional branches).
+- Ensure `pre-commit` performs Hugo build and hook quality checks.
 - Check changed links and examples against source.
 - Do not push until validation passes.
+
+## Known Failure Patterns
+
+- Branch-only URL replacement (`8.x` to `9.1.x`) without verifying path existence.
+- Module origins linked to `PrestaShop/PrestaShop/modules/...` instead of native module repositories.
+- `files: {}` used even though source or reviewer provides a concrete origin file.
+- Hook page kept while hook is obsolete and has no valid origin in target branch.
+- Call snippet includes unrelated context or misses required invocation content.
+- Wrong code fence language for snippet type (`php`, `twig`, `smarty`).
+- Truncated `Hook::exec(...)` examples with incomplete parameter arrays.
 
 ## Continuous Improvement
 
