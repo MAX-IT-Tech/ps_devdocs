@@ -1,6 +1,16 @@
 name: Test Build
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "1.7.x"
+      - "8.x"
+      - "9.x"
+  pull_request:
+    branches:
+      - "1.7.x"
+      - "8.x"
+      - "9.x"
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,7 +30,7 @@ jobs:
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v2
         with:
-          hugo-version: '0.121.1'
+          hugo-version: "0.121.1"
           extended: true
 
       - name: Find version from branch name (pull request)
